@@ -23,12 +23,8 @@ COPY backend/ .
 # Create directories
 RUN mkdir -p /app/uploads
 
-# Expose port (Railway uses $PORT)
-EXPOSE ${PORT:-8000}
+# Expose port
+EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=15s \
-    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
-
-# Run uvicorn — Railway sets PORT env var
-CMD ["/bin/sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
+# Run uvicorn
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

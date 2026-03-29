@@ -1,0 +1,123 @@
+import logging
+import secrets
+from pydantic_settings import BaseSettings
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+_DEFAULT_SECRET = "your-secret-key-change-in-production-09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
+
+
+def _generate_secret_key() -> str:
+    """Generate a secure random SECRET_KEY if not provided."""
+    key = secrets.token_hex(32)
+    logger.warning(
+        "[SECURITY] SECRET_KEY was not set — generated a random key. "
+        "This key changes on every restart! Set SECRET_KEY in .env for persistent sessions."
+    )
+    return key
+
+
+class Settings(BaseSettings):
+    """Application settings — override via .env or environment variables."""
+
+    # Application
+    PROJECT_NAME: str = "ntFAST — Financial Analysis System for Transactions"
+    VERSION: str = "1.0.0"
+    API_PREFIX: str = "/api"
+    DEBUG: bool = False
+
+    # Database
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/financial_analysis"
+
+    # Security
+    SECRET_KEY: str = _DEFAULT_SECRET
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_DAYS: int = 30
+
+    # CORS — Railway domains added automatically via validate_startup()
+    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+
+    # Railway.app auto-detection
+    RAILWAY_PUBLIC_DOMAIN: str = ""
+    RAILWAY_ENVIRONMENT: str = ""
+    PORT: int = 8000  # Railway sets this
+
+    # Email Configuration
+    SMTP_SERVER: str = "smtp.mail.ru"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    USE_REAL_EMAIL: bool = False
+
+    # File Upload Configuration
+    UPLOAD_DIR: str = "./uploads"
+    MAX_FILE_SIZE: int = 50 * 1024 * 1024  # 50 MB
+    ALLOWED_FILE_TYPES: list[str] = ["pdf", "csv", "xlsx", "xls"]
+
+    # AI Configuration
+    CLAUDE_API_KEY: str = ""
+    CLAUDE_MODEL: str = "claude-sonnet-4-20250514"
+    OLLAMA_HOST: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3:8b"
+    AI_PRIMARY_PROVIDER: str = "claude"
+    AI_MAX_TOKENS: int = 4096
+
+    # Celery & Redis Configuration
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+    CELERY_TASK_TRACK_STARTED: bool = True
+    CELERY_TASK_TIME_LIMIT: int = 30 * 60
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
+    def validate_startup(self) -> None:
+        """Validate critical settings on application startup."""
+        warnings = []
+
+        # SECURITY: Never run with the default secret key
+        if self.SECRET_KEY == _DEFAULT_SECRET:
+            self.SECRET_KEY = _generate_secret_key()
+            warnings.append(
+                "SECRET_KEY was default — auto-generated a random key. "
+                "Set SECRET_KEY in .env for persistent JWT sessions: "
+                "python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+
+        if not self.SMTP_USERNAME and self.USE_REAL_EMAIL:
+            warnings.append(
+                "USE_REAL_EMAIL=true but SMTP_USERNAME is empty. "
+                "Emails will fail to send."
+            )
+
+        if "sqlite" not in self.DATABASE_URL and "localhost" not in self.DATABASE_URL:
+            logger.info(f"Database: remote ({self.DATABASE_URL.split('@')[-1].split('/')[0]})")
+
+        # Railway.app: auto-add CORS origins for Railway domains
+        if self.RAILWAY_ENVIRONMENT or self.RAILWAY_PUBLIC_DOMAIN:
+            import os
+            railway_origins = []
+            # Add all Railway service domains from env
+            for key, val in os.environ.items():
+                if 'RAILWAY' in key and 'DOMAIN' in key and val:
+                    railway_origins.append(f"https://{val}")
+                    railway_origins.append(f"http://{val}")
+            # Add any custom domain
+            if self.RAILWAY_PUBLIC_DOMAIN:
+                railway_origins.append(f"https://{self.RAILWAY_PUBLIC_DOMAIN}")
+            for origin in railway_origins:
+                if origin not in self.BACKEND_CORS_ORIGINS:
+                    self.BACKEND_CORS_ORIGINS.append(origin)
+            if railway_origins:
+                logger.info(f"[RAILWAY] Added CORS origins: {railway_origins}")
+
+        for w in warnings:
+            logger.warning(f"[CONFIG] {w}")
+
+
+settings = Settings()

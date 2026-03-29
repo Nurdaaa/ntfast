@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv
+venv
+env
+*.egg-info
+.pytest_cache
+.mypy_cache
+htmlcov
+.coverage
+.tox
+
+# Node
+node_modules
+dist
+build
+coverage
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Project specific
+*.db
+uploads/*
+logs/*
+.claude
+backups/
+test_data/
+*.log
+.env.local
+.env.*.local
+redis/
+_start_*.bat
+server.bat
+
+# ML training data (models are needed)
+ml_service/ml/data/*.csv
+ml_service/notebooks/

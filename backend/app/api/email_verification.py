@@ -2,7 +2,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.models.user import User
 from app.schemas.email_verification import (
     EmailVerificationRequest,
     EmailVerificationCheck,
@@ -24,22 +23,13 @@ async def send_verification_code(
     db: Session = Depends(get_db)
 ):
     """Send verification code to email.
+    Works for both existing users (password reset) and new registrations.
     Always returns the same response to prevent email enumeration.
     """
-    # Check if a user with this email actually exists
-    user = db.query(User).filter(User.email == request.email).first()
-
-    if not user:
-        # Return generic success — do NOT reveal that the email is unregistered
-        logger.info(f"Verification requested for non-existent email (not sending)")
-        return EmailVerificationResponse(
-            message=_GENERIC_SEND_MESSAGE,
-            success=True
-        )
-
     try:
         code = EmailService.create_verification_code(db, request.email)
         EmailService.send_verification_code(request.email, code)
+        logger.info(f"Verification code sent to {request.email}")
     except Exception:
         # Log the error but still return the generic message
         logger.exception("Failed to send verification code")

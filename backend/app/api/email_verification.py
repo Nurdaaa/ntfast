@@ -1,5 +1,7 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.email_verification import (
@@ -16,23 +18,36 @@ router = APIRouter()
 # Generic response to prevent email enumeration
 _GENERIC_SEND_MESSAGE = "If this email is registered, a verification code has been sent"
 
+# Thread pool for SMTP (blocking I/O)
+_smtp_executor = ThreadPoolExecutor(max_workers=2)
+
+
+def _send_email_background(email: str, code: str):
+    """Send email in background thread (SMTP is blocking I/O)."""
+    try:
+        EmailService.send_verification_code(email, code)
+        logger.info(f"Verification code sent to {email}")
+    except Exception:
+        logger.exception(f"Failed to send verification code to {email}")
+
 
 @router.post("/send-code", response_model=EmailVerificationResponse)
 async def send_verification_code(
     request: EmailVerificationRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """Send verification code to email.
     Works for both existing users (password reset) and new registrations.
     Always returns the same response to prevent email enumeration.
+    Email is sent in background to avoid blocking the response.
     """
     try:
         code = EmailService.create_verification_code(db, request.email)
-        EmailService.send_verification_code(request.email, code)
-        logger.info(f"Verification code sent to {request.email}")
+        # Send email in background — don't block the HTTP response
+        background_tasks.add_task(_send_email_background, request.email, code)
     except Exception:
-        # Log the error but still return the generic message
-        logger.exception("Failed to send verification code")
+        logger.exception("Failed to create verification code")
 
     return EmailVerificationResponse(
         message=_GENERIC_SEND_MESSAGE,

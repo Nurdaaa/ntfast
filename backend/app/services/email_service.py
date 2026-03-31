@@ -93,10 +93,17 @@ ntFAST
                 message.attach(part1)
                 message.attach(part2)
 
-                with smtplib.SMTP(EmailService.SMTP_SERVER, EmailService.SMTP_PORT) as server:
-                    server.starttls()
-                    server.login(EmailService.SMTP_USERNAME, EmailService.SMTP_PASSWORD)
-                    server.send_message(message)
+                if EmailService.SMTP_PORT == 465:
+                    # SSL (port 465)
+                    with smtplib.SMTP_SSL(EmailService.SMTP_SERVER, EmailService.SMTP_PORT) as server:
+                        server.login(EmailService.SMTP_USERNAME, EmailService.SMTP_PASSWORD)
+                        server.send_message(message)
+                else:
+                    # STARTTLS (port 587)
+                    with smtplib.SMTP(EmailService.SMTP_SERVER, EmailService.SMTP_PORT) as server:
+                        server.starttls()
+                        server.login(EmailService.SMTP_USERNAME, EmailService.SMTP_PASSWORD)
+                        server.send_message(message)
 
                 logger.info(f"Verification email sent to {email}")
 
@@ -264,10 +271,17 @@ ntFAST
                 message.attach(part1)
                 message.attach(part2)
 
-                with smtplib.SMTP(EmailService.SMTP_SERVER, EmailService.SMTP_PORT) as server:
-                    server.starttls()
-                    server.login(EmailService.SMTP_USERNAME, EmailService.SMTP_PASSWORD)
-                    server.send_message(message)
+                if EmailService.SMTP_PORT == 465:
+                    # SSL (port 465)
+                    with smtplib.SMTP_SSL(EmailService.SMTP_SERVER, EmailService.SMTP_PORT) as server:
+                        server.login(EmailService.SMTP_USERNAME, EmailService.SMTP_PASSWORD)
+                        server.send_message(message)
+                else:
+                    # STARTTLS (port 587)
+                    with smtplib.SMTP(EmailService.SMTP_SERVER, EmailService.SMTP_PORT) as server:
+                        server.starttls()
+                        server.login(EmailService.SMTP_USERNAME, EmailService.SMTP_PASSWORD)
+                        server.send_message(message)
 
                 logger.info(f"Password reset email sent to {email}")
 

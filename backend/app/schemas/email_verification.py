@@ -16,4 +16,3 @@ class EmailVerificationResponse(BaseModel):
     """Response for verification operations"""
     message: str
     success: bool
-    code: str | None = None  # Returned when SMTP delivery fails (fallback mode)

@@ -42,23 +42,16 @@ async def send_verification_code(
     Always returns the same response to prevent email enumeration.
     Email is sent in background to avoid blocking the response.
     """
-    code = None
     try:
         code = EmailService.create_verification_code(db, request.email)
-        # Try to send email in background
+        # Send email in background — don't block the HTTP response
         background_tasks.add_task(_send_email_background, request.email, code)
     except Exception:
         logger.exception("Failed to create verification code")
 
-    # If SMTP is not configured or unreliable, return code in response
-    # so the frontend can auto-fill it (fallback mode)
-    from app.core.config import settings
-    return_code = code if not settings.USE_REAL_EMAIL else code  # Always return for now (Railway SMTP unreliable)
-
     return EmailVerificationResponse(
         message=_GENERIC_SEND_MESSAGE,
-        success=True,
-        code=return_code
+        success=True
     )
 
 

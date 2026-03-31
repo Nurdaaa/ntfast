@@ -44,7 +44,7 @@ export const Register = () => {
     if (!validateForm()) return;
     setLoading(true);
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/auth/register`, {
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/register`, {
         email, password, full_name: fullName,
       });
       setSuccess(true);

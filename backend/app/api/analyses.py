@@ -328,10 +328,23 @@ async def batch_delete_analyses(
         if current_user.role != "admin" and db_analysis.analyst_id != current_user.id:
             errors.append(f"Not authorized to delete analysis {analysis_id}")
             continue
-        db.delete(db_analysis)
-        deleted += 1
+        try:
+            db.delete(db_analysis)
+            db.flush()
+            deleted += 1
+        except Exception as e:
+            db.rollback()
+            errors.append(f"Failed to delete analysis {analysis_id}: {str(e)}")
 
-    db.commit()
+    if deleted > 0:
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to commit batch delete: {str(e)}"
+            )
     return {"deleted": deleted, "errors": errors}
 
 
@@ -398,7 +411,6 @@ async def delete_analysis(
 ):
     """Delete analysis (admin or owner)"""
     import traceback
-    from app.models.transaction import Transaction
 
     db_analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
     if not db_analysis:
@@ -415,9 +427,7 @@ async def delete_analysis(
         )
 
     try:
-        # Explicitly delete related transactions first
-        db.query(Transaction).filter(Transaction.analysis_id == analysis_id).delete(synchronize_session=False)
-        # Then delete the analysis
+        # Cascade handles transaction deletion via relationship config
         db.delete(db_analysis)
         db.commit()
         return {"ok": True, "deleted_id": analysis_id}

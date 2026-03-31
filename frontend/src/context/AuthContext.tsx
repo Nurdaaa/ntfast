@@ -48,7 +48,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (credentials: LoginCredentials) => {
     const response = await authAPI.login(credentials);
-    localStorage.setItem('access_token', response.access_token);
 
     // SECURITY: Use session_start from BACKEND (single source of truth)
     // NEVER create timestamp on frontend - always use backend time
@@ -58,7 +57,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     // Fetch current user (includes previous_login from backend)
+    // Token is set AFTER this succeeds to avoid broken state where token exists but user is null
     const currentUser = await authAPI.getCurrentUser();
+
+    // Only persist token after successful user fetch
+    localStorage.setItem('access_token', response.access_token);
 
     // SECURITY: Save previous_login to localStorage (backend is source of truth)
     // This value is FIXED and should NEVER change during current session

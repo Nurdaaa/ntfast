@@ -99,8 +99,13 @@ const AccountSecurity: React.FC<AccountSecurityProps> = ({ userId }) => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchLoginHistory(), fetchActiveSessions()]);
-      setLoading(false);
+      try {
+        await Promise.all([fetchLoginHistory(), fetchActiveSessions()]);
+      } catch (error) {
+        console.error('Failed to load security data:', error);
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
   }, [userId]);

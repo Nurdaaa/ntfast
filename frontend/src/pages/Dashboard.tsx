@@ -135,29 +135,28 @@ export const Dashboard = () => {
   }, [bgAnalysis.isAnalyzing]);
 
   const loadDashboard = async () => {
-    try {
-      if (!cachedStats) setLoading(true);
-      const results = await Promise.allSettled([
-        analysesAPI.getStats(),
-        analysesAPI.getAll(),
-      ]);
+    if (!cachedStats) setLoading(true);
+    const results = await Promise.allSettled([
+      analysesAPI.getStats(),
+      analysesAPI.getAll(),
+    ]);
 
-      if (results[0].status === 'fulfilled') {
-        cachedStats = results[0].value;
-        setStats(results[0].value);
-      }
-      if (results[1].status === 'fulfilled') {
-        const sorted = [...results[1].value]
-          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          .slice(0, 5);
-        cachedRecent = sorted;
-        setRecentAnalyses(sorted);
-      }
-    } catch (error) {
-      console.error('Dashboard load error:', error);
-    } finally {
-      setLoading(false);
+    if (results[0].status === 'fulfilled') {
+      cachedStats = results[0].value;
+      setStats(results[0].value);
+    } else {
+      console.error('Failed to load stats:', results[0].reason);
     }
+    if (results[1].status === 'fulfilled') {
+      const sorted = [...results[1].value]
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5);
+      cachedRecent = sorted;
+      setRecentAnalyses(sorted);
+    } else {
+      console.error('Failed to load recent analyses:', results[1].reason);
+    }
+    setLoading(false);
   };
 
   /* ── loading skeleton ── */

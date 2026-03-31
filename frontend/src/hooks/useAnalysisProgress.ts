@@ -52,6 +52,7 @@ export function useAnalysisProgress() {
   const wsRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string>('');
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Генерирует уникальный session ID
@@ -147,7 +148,7 @@ export function useAnalysisProgress() {
         if (event.code !== 1000 && retryCount < maxRetries) {
           retryCount++;
           const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 8000);
-          setTimeout(attemptConnect, delay);
+          retryTimerRef.current = setTimeout(attemptConnect, delay);
         }
       };
 
@@ -164,6 +165,10 @@ export function useAnalysisProgress() {
    * Отключиться от WebSocket.
    */
   const disconnect = useCallback(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;

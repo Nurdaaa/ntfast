@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     USE_REAL_EMAIL: bool = False
 
+    # Resend.com API (alternative to SMTP, works from cloud servers)
+    RESEND_API_KEY: str = ""
+    EMAIL_PROVIDER: str = "smtp"  # "smtp" or "resend"
+
     # File Upload Configuration
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE: int = 50 * 1024 * 1024  # 50 MB

@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     # Mailtrap — 1000 emails/month free, GitHub signup supported
     MAILTRAP_API_TOKEN: str = ""
 
+    # Courier — 10,000 emails/month free, GitHub signup
+    COURIER_API_KEY: str = ""
+
     # Email verification toggle — set to false to skip verification on registration
     REQUIRE_EMAIL_VERIFICATION: bool = True
 

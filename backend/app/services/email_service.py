@@ -26,6 +26,7 @@ class EmailService:
     MAILJET_API_KEY = settings.MAILJET_API_KEY
     MAILJET_SECRET_KEY = settings.MAILJET_SECRET_KEY
     MAILTRAP_API_TOKEN = settings.MAILTRAP_API_TOKEN
+    COURIER_API_KEY = settings.COURIER_API_KEY
 
     # ──────────────────────────────────────────────
     # HTML templates
@@ -179,6 +180,42 @@ class EmailService:
             return False
 
     @staticmethod
+    def _send_via_courier(to_email: str, subject: str, html_body: str) -> bool:
+        """Send email via Courier API — 10,000 emails/month free, GitHub signup."""
+        try:
+            response = httpx.post(
+                "https://api.courier.com/send",
+                headers={
+                    "Authorization": f"Bearer {EmailService.COURIER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "message": {
+                        "to": {"email": to_email},
+                        "content": {
+                            "title": subject,
+                            "body": html_body,
+                        },
+                        "routing": {
+                            "method": "single",
+                            "channels": ["email"],
+                        },
+                    }
+                },
+                timeout=15,
+            )
+            if response.status_code in (200, 202):
+                data = response.json()
+                logger.info(f"[COURIER] Email sent to {to_email}, requestId={data.get('requestId')}")
+                return True
+            else:
+                logger.error(f"[COURIER] Failed to send to {to_email}: {response.status_code} {response.text}")
+                return False
+        except Exception as e:
+            logger.error(f"[COURIER] Exception sending to {to_email}: {e}")
+            return False
+
+    @staticmethod
     def _send_via_mailtrap(to_email: str, subject: str, html_body: str) -> bool:
         """Send email via Mailtrap API — 1000 emails/month free, GitHub signup."""
         try:
@@ -252,7 +289,9 @@ class EmailService:
         send_methods = []
 
         # Primary provider
-        if provider == "mailtrap" and EmailService.MAILTRAP_API_TOKEN:
+        if provider == "courier" and EmailService.COURIER_API_KEY:
+            send_methods.append(("courier", lambda: EmailService._send_via_courier(to_email, subject, html_body)))
+        elif provider == "mailtrap" and EmailService.MAILTRAP_API_TOKEN:
             send_methods.append(("mailtrap", lambda: EmailService._send_via_mailtrap(to_email, subject, html_body)))
         elif provider == "mailjet" and EmailService.MAILJET_API_KEY:
             send_methods.append(("mailjet", lambda: EmailService._send_via_mailjet(to_email, subject, html_body)))
@@ -260,6 +299,10 @@ class EmailService:
             send_methods.append(("brevo", lambda: EmailService._send_via_brevo(to_email, subject, html_body)))
         elif provider == "resend" and EmailService.RESEND_API_KEY:
             send_methods.append(("resend", lambda: EmailService._send_via_resend(to_email, subject, html_body)))
+
+        # Fallback: try Courier if not primary
+        if provider != "courier" and EmailService.COURIER_API_KEY:
+            send_methods.append(("courier-fallback", lambda: EmailService._send_via_courier(to_email, subject, html_body)))
 
         # Fallback: try Mailtrap if not primary
         if provider != "mailtrap" and EmailService.MAILTRAP_API_TOKEN:

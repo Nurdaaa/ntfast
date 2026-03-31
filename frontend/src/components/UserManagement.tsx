@@ -65,7 +65,7 @@ const UserManagement: React.FC = () => {
   const fetchCurrentUser = async () => {
     try {
       const data = await authAPI.getCurrentUser();
-      setCurrentUser(data);
+      setCurrentUser(data as any);
     } catch (error) {
       console.error('Error fetching current user:', error);
     }

@@ -143,14 +143,14 @@ async def get_analyses(
             from_date = datetime.fromisoformat(date_from)
             query = query.filter(Analysis.created_at >= from_date)
         except ValueError:
-            pass
+            raise HTTPException(status_code=422, detail=f"Invalid date_from format: '{date_from}'. Use ISO format: YYYY-MM-DD")
     if date_to:
         try:
             to_date = datetime.fromisoformat(date_to)
             to_date = to_date.replace(hour=23, minute=59, second=59)
             query = query.filter(Analysis.created_at <= to_date)
         except ValueError:
-            pass
+            raise HTTPException(status_code=422, detail=f"Invalid date_to format: '{date_to}'. Use ISO format: YYYY-MM-DD")
 
     # Search by file_name or account_owner
     if search:

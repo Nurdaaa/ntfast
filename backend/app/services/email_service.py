@@ -180,9 +180,21 @@ class EmailService:
             return False
 
     @staticmethod
+    def _strip_html(html: str) -> str:
+        """Convert HTML to plain text for providers that don't support HTML."""
+        import re
+        text = re.sub(r'<br\s*/?>', '\n', html)
+        text = re.sub(r'<[^>]+>', '', text)
+        text = re.sub(r'\n\s*\n', '\n\n', text).strip()
+        return text
+
+    @staticmethod
     def _send_via_courier(to_email: str, subject: str, html_body: str) -> bool:
         """Send email via Courier API — 10,000 emails/month free, GitHub signup."""
         try:
+            # Courier content.body expects text/markdown, not HTML
+            # Use elemental format to send HTML content
+            plain_text = EmailService._strip_html(html_body)
             response = httpx.post(
                 "https://api.courier.com/send",
                 headers={
@@ -194,7 +206,7 @@ class EmailService:
                         "to": {"email": to_email},
                         "content": {
                             "title": subject,
-                            "body": html_body,
+                            "body": plain_text,
                         },
                         "routing": {
                             "method": "single",

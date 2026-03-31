@@ -189,11 +189,22 @@ class EmailService:
         return text
 
     @staticmethod
+    def _is_same_domain_email(to_email: str) -> bool:
+        """Check if recipient is on the same domain as SMTP sender (e.g. both @mail.ru)."""
+        if not EmailService.SMTP_USERNAME:
+            return False
+        try:
+            sender_domain = EmailService.SMTP_USERNAME.split('@')[1].lower()
+            recipient_domain = to_email.split('@')[1].lower()
+            return sender_domain == recipient_domain
+        except (IndexError, AttributeError):
+            return False
+
+    @staticmethod
     def _send_via_courier(to_email: str, subject: str, html_body: str) -> bool:
         """Send email via Courier API — 10,000 emails/month free, GitHub signup."""
         try:
             # Courier content.body expects text/markdown, not HTML
-            # Use elemental format to send HTML content
             plain_text = EmailService._strip_html(html_body)
             response = httpx.post(
                 "https://api.courier.com/send",
@@ -288,53 +299,41 @@ class EmailService:
 
     @staticmethod
     def _send_email(to_email: str, subject: str, html_body: str, text_body: str = "") -> bool:
-        """Send email using configured provider with automatic fallback.
+        """Send email with smart routing.
 
-        Priority chain: configured provider → fallback providers → demo mode.
-        Brevo: 300/day free, works for ALL emails, no domain needed.
-        Resend: fast but free plan only sends to account owner's email.
-        SMTP: works locally but often blocked from cloud servers.
+        Strategy:
+        - Same-domain emails (e.g. mail.ru → mail.ru): SMTP first (internal delivery is reliable)
+        - Other emails: Courier first, then other API providers, SMTP last
         """
-        provider = EmailService.EMAIL_PROVIDER
+        has_smtp = EmailService.USE_REAL_EMAIL and EmailService.SMTP_USERNAME and EmailService.SMTP_PASSWORD
+        has_courier = bool(EmailService.COURIER_API_KEY)
+        same_domain = EmailService._is_same_domain_email(to_email)
 
-        # Build ordered list of send methods to try
+        # Build ordered list of send methods
         send_methods = []
 
-        # Primary provider
-        if provider == "courier" and EmailService.COURIER_API_KEY:
+        if same_domain and has_smtp:
+            # Same domain (mail.ru → mail.ru): SMTP first — internal delivery is fast & reliable
+            logger.info(f"[EMAIL] Same-domain detected, using SMTP first for {to_email}")
+            send_methods.append(("smtp-direct", lambda: EmailService._send_via_smtp(to_email, subject, html_body, text_body)))
+
+        # Courier — works for most external emails
+        if has_courier:
             send_methods.append(("courier", lambda: EmailService._send_via_courier(to_email, subject, html_body)))
-        elif provider == "mailtrap" and EmailService.MAILTRAP_API_TOKEN:
-            send_methods.append(("mailtrap", lambda: EmailService._send_via_mailtrap(to_email, subject, html_body)))
-        elif provider == "mailjet" and EmailService.MAILJET_API_KEY:
-            send_methods.append(("mailjet", lambda: EmailService._send_via_mailjet(to_email, subject, html_body)))
-        elif provider == "brevo" and EmailService.BREVO_API_KEY:
+
+        # Other API providers as fallback
+        if EmailService.BREVO_API_KEY:
             send_methods.append(("brevo", lambda: EmailService._send_via_brevo(to_email, subject, html_body)))
-        elif provider == "resend" and EmailService.RESEND_API_KEY:
+        if EmailService.MAILTRAP_API_TOKEN:
+            send_methods.append(("mailtrap", lambda: EmailService._send_via_mailtrap(to_email, subject, html_body)))
+        if EmailService.MAILJET_API_KEY:
+            send_methods.append(("mailjet", lambda: EmailService._send_via_mailjet(to_email, subject, html_body)))
+        if EmailService.RESEND_API_KEY:
             send_methods.append(("resend", lambda: EmailService._send_via_resend(to_email, subject, html_body)))
 
-        # Fallback: try Courier if not primary
-        if provider != "courier" and EmailService.COURIER_API_KEY:
-            send_methods.append(("courier-fallback", lambda: EmailService._send_via_courier(to_email, subject, html_body)))
-
-        # Fallback: try Mailtrap if not primary
-        if provider != "mailtrap" and EmailService.MAILTRAP_API_TOKEN:
-            send_methods.append(("mailtrap-fallback", lambda: EmailService._send_via_mailtrap(to_email, subject, html_body)))
-
-        # Fallback: try Mailjet if not primary
-        if provider != "mailjet" and EmailService.MAILJET_API_KEY:
-            send_methods.append(("mailjet-fallback", lambda: EmailService._send_via_mailjet(to_email, subject, html_body)))
-
-        # Fallback: try Brevo if not primary
-        if provider != "brevo" and EmailService.BREVO_API_KEY:
-            send_methods.append(("brevo-fallback", lambda: EmailService._send_via_brevo(to_email, subject, html_body)))
-
-        # Fallback: try Resend if not primary
-        if provider != "resend" and EmailService.RESEND_API_KEY:
-            send_methods.append(("resend-fallback", lambda: EmailService._send_via_resend(to_email, subject, html_body)))
-
-        # Fallback: try SMTP
-        if EmailService.USE_REAL_EMAIL and EmailService.SMTP_USERNAME and EmailService.SMTP_PASSWORD:
-            send_methods.append(("smtp", lambda: EmailService._send_via_smtp(to_email, subject, html_body, text_body)))
+        # SMTP as last resort (if not already first)
+        if has_smtp and not same_domain:
+            send_methods.append(("smtp-fallback", lambda: EmailService._send_via_smtp(to_email, subject, html_body, text_body)))
 
         # Try each method in order
         for name, method in send_methods:

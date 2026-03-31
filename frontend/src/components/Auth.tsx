@@ -70,8 +70,13 @@ export const Auth = () => {
   const sendVerificationCode = async () => {
     setSendingCode(true); setVerificationError('');
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/email-verification/send-code`, { email: registerEmail });
+      const res = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/email-verification/send-code`, { email: registerEmail });
       setCodeSent(true); setVerificationError('');
+      // Fallback: if server returns code directly (SMTP unreliable), auto-fill it
+      if (res.data?.code) {
+        const codeChars = res.data.code.split('');
+        setVerificationCode(codeChars.concat(Array(6 - codeChars.length).fill('')).slice(0, 6));
+      }
     } catch (err: any) { setVerificationError(err.response?.data?.detail || 'Failed to send verification code'); }
     finally { setSendingCode(false); }
   };

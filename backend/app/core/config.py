@@ -57,6 +57,13 @@ class Settings(BaseSettings):
     # Brevo (Sendinblue) — 300 emails/day free, works without custom domain
     BREVO_API_KEY: str = ""
 
+    # Mailjet — 200 emails/day free, no phone verification needed
+    MAILJET_API_KEY: str = ""
+    MAILJET_SECRET_KEY: str = ""
+
+    # Mailtrap — 1000 emails/month free, GitHub signup supported
+    MAILTRAP_API_TOKEN: str = ""
+
     # Email verification toggle — set to false to skip verification on registration
     REQUIRE_EMAIL_VERIFICATION: bool = True
 

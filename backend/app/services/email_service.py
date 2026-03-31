@@ -23,6 +23,9 @@ class EmailService:
     RESEND_API_KEY = settings.RESEND_API_KEY
     EMAIL_PROVIDER = settings.EMAIL_PROVIDER
     BREVO_API_KEY = settings.BREVO_API_KEY
+    MAILJET_API_KEY = settings.MAILJET_API_KEY
+    MAILJET_SECRET_KEY = settings.MAILJET_SECRET_KEY
+    MAILTRAP_API_TOKEN = settings.MAILTRAP_API_TOKEN
 
     # ──────────────────────────────────────────────
     # HTML templates
@@ -141,6 +144,71 @@ class EmailService:
             return False
 
     @staticmethod
+    def _send_via_mailjet(to_email: str, subject: str, html_body: str) -> bool:
+        """Send email via Mailjet HTTP API — 200 emails/day free, no phone verification."""
+        try:
+            sender_email = EmailService.SMTP_USERNAME or "noreply@ntfast.app"
+            response = httpx.post(
+                "https://api.mailjet.com/v3.1/send",
+                auth=(EmailService.MAILJET_API_KEY, EmailService.MAILJET_SECRET_KEY),
+                headers={"Content-Type": "application/json"},
+                json={
+                    "Messages": [{
+                        "From": {"Email": sender_email, "Name": "ntFAST"},
+                        "To": [{"Email": to_email}],
+                        "Subject": subject,
+                        "HTMLPart": html_body,
+                    }]
+                },
+                timeout=10,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                messages = data.get("Messages", [])
+                if messages and messages[0].get("Status") == "success":
+                    logger.info(f"[MAILJET] Email sent to {to_email}")
+                    return True
+                else:
+                    logger.error(f"[MAILJET] Unexpected response for {to_email}: {data}")
+                    return False
+            else:
+                logger.error(f"[MAILJET] Failed to send to {to_email}: {response.status_code} {response.text}")
+                return False
+        except Exception as e:
+            logger.error(f"[MAILJET] Exception sending to {to_email}: {e}")
+            return False
+
+    @staticmethod
+    def _send_via_mailtrap(to_email: str, subject: str, html_body: str) -> bool:
+        """Send email via Mailtrap API — 1000 emails/month free, GitHub signup."""
+        try:
+            sender_email = EmailService.SMTP_USERNAME or "noreply@ntfast.app"
+            response = httpx.post(
+                "https://send.api.mailtrap.io/api/send",
+                headers={
+                    "Authorization": f"Bearer {EmailService.MAILTRAP_API_TOKEN}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": {"email": sender_email, "name": "ntFAST"},
+                    "to": [{"email": to_email}],
+                    "subject": subject,
+                    "html": html_body,
+                },
+                timeout=10,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"[MAILTRAP] Email sent to {to_email}, success={data.get('success')}")
+                return True
+            else:
+                logger.error(f"[MAILTRAP] Failed to send to {to_email}: {response.status_code} {response.text}")
+                return False
+        except Exception as e:
+            logger.error(f"[MAILTRAP] Exception sending to {to_email}: {e}")
+            return False
+
+    @staticmethod
     def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str = "") -> bool:
         """Send email via SMTP (mail.ru, gmail, etc.)."""
         try:
@@ -183,10 +251,23 @@ class EmailService:
         # Build ordered list of send methods to try
         send_methods = []
 
-        if provider == "brevo" and EmailService.BREVO_API_KEY:
+        # Primary provider
+        if provider == "mailtrap" and EmailService.MAILTRAP_API_TOKEN:
+            send_methods.append(("mailtrap", lambda: EmailService._send_via_mailtrap(to_email, subject, html_body)))
+        elif provider == "mailjet" and EmailService.MAILJET_API_KEY:
+            send_methods.append(("mailjet", lambda: EmailService._send_via_mailjet(to_email, subject, html_body)))
+        elif provider == "brevo" and EmailService.BREVO_API_KEY:
             send_methods.append(("brevo", lambda: EmailService._send_via_brevo(to_email, subject, html_body)))
         elif provider == "resend" and EmailService.RESEND_API_KEY:
             send_methods.append(("resend", lambda: EmailService._send_via_resend(to_email, subject, html_body)))
+
+        # Fallback: try Mailtrap if not primary
+        if provider != "mailtrap" and EmailService.MAILTRAP_API_TOKEN:
+            send_methods.append(("mailtrap-fallback", lambda: EmailService._send_via_mailtrap(to_email, subject, html_body)))
+
+        # Fallback: try Mailjet if not primary
+        if provider != "mailjet" and EmailService.MAILJET_API_KEY:
+            send_methods.append(("mailjet-fallback", lambda: EmailService._send_via_mailjet(to_email, subject, html_body)))
 
         # Fallback: try Brevo if not primary
         if provider != "brevo" and EmailService.BREVO_API_KEY:

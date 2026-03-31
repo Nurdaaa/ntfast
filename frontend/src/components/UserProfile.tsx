@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from './ui/Button';
 import Modal from './ui/Modal';
 import { UserRound, AtSign, ShieldCheck, Timer, CalendarDays, Zap, TrendingUp, BadgeCheck, AlertCircle, Loader } from 'lucide-react';
+import { usersAPI } from '../services/api';
 
 interface UserAnalysisStats {
   total_analyses: number;
@@ -49,20 +50,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ userId, isOpen, onClose }) =>
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/users/${userId}/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data);
-      } else {
-        setError(t('userProfile.errorLoading') || 'Error loading profile');
-      }
+      const data = await usersAPI.getProfile(userId);
+      setProfile(data);
     } catch (err) {
       setError(t('userProfile.networkError') || 'Network error');
     } finally {

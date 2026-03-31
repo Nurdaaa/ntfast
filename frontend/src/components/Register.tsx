@@ -5,8 +5,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { Moon, Sun, Loader2, AlertCircle, BadgeCheck, ArrowRight, AtSign, KeyRound, UserRoundPlus, UserRound } from 'lucide-react';
-import axios from 'axios';
 import { PasswordStrength } from './ui/PasswordStrength';
+import { authAPI } from '../services/api';
 
 export const Register = () => {
   const [fullName, setFullName] = useState('');
@@ -44,9 +44,7 @@ export const Register = () => {
     if (!validateForm()) return;
     setLoading(true);
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/register`, {
-        email, password, full_name: fullName,
-      });
+      await authAPI.register({ email, password, full_name: fullName } as any);
       setSuccess(true);
       setTimeout(() => navigate('/login'), 2000);
     } catch (err: any) {

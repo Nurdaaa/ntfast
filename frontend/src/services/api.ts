@@ -68,8 +68,82 @@ export const authAPI = {
     return response.data;
   },
 
+  completeRegistration: async (data: RegisterData): Promise<User> => {
+    const response = await api.post<User>('/auth/complete-registration', data);
+    return response.data;
+  },
+
   getCurrentUser: async (): Promise<User> => {
     const response = await api.get<User>('/auth/me');
+    return response.data;
+  },
+
+  logout: async (): Promise<void> => {
+    await api.post('/auth/logout');
+  },
+
+  changePassword: async (data: { current_password: string; new_password: string }): Promise<any> => {
+    const response = await api.post('/auth/change-password', data);
+    return response.data;
+  },
+
+  forgotPassword: async (data: { email: string }): Promise<any> => {
+    const response = await api.post('/auth/forgot-password', data);
+    return response.data;
+  },
+
+  resetPassword: async (data: { email: string; code: string; new_password: string }): Promise<any> => {
+    const response = await api.post('/auth/reset-password', data);
+    return response.data;
+  },
+
+  loginHistory: async (limit: number = 10): Promise<any> => {
+    const response = await api.get(`/auth/login-history?limit=${limit}`);
+    return response.data;
+  },
+
+  activeSessions: async (): Promise<any> => {
+    const response = await api.get('/auth/active-sessions');
+    return response.data;
+  },
+
+  closeAllSessions: async (): Promise<any> => {
+    const response = await api.post('/auth/close-all-sessions');
+    return response.data;
+  },
+};
+
+// Email Verification API
+export const emailVerificationAPI = {
+  sendCode: async (email: string): Promise<any> => {
+    const response = await api.post('/email-verification/send-code', { email });
+    return response.data;
+  },
+
+  verifyCode: async (email: string, code: string): Promise<any> => {
+    const response = await api.post('/email-verification/verify-code', { email, code });
+    return response.data;
+  },
+};
+
+// Users Management API
+export const usersAPI = {
+  getAll: async (): Promise<any> => {
+    const response = await api.get('/users/');
+    return response.data;
+  },
+
+  updateRole: async (userId: number, role: string): Promise<any> => {
+    const response = await api.patch(`/users/${userId}/role`, { role });
+    return response.data;
+  },
+
+  delete: async (userId: number): Promise<void> => {
+    await api.delete(`/users/${userId}`);
+  },
+
+  getProfile: async (userId: number): Promise<any> => {
+    const response = await api.get(`/users/${userId}/profile`);
     return response.data;
   },
 };

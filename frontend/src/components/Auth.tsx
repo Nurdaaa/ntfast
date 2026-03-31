@@ -6,9 +6,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { Moon, Sun, Loader2, AlertCircle, BadgeCheck, ArrowRight, UserRound, AtSign, KeyRound, UserRoundPlus, Languages, Eye, EyeOff } from 'lucide-react';
-import axios from 'axios';
 import i18n from '../i18n';
 import { LogoIcon } from './ui/LogoIcon';
+import { authAPI, emailVerificationAPI } from '../services/api';
 
 export const Auth = () => {
   const location = useLocation();
@@ -70,7 +70,7 @@ export const Auth = () => {
   const sendVerificationCode = async () => {
     setSendingCode(true); setVerificationError('');
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/email-verification/send-code`, { email: registerEmail });
+      await emailVerificationAPI.sendCode(registerEmail);
       setCodeSent(true); setVerificationError('');
     } catch (err: any) { setVerificationError(err.response?.data?.detail || 'Failed to send verification code'); }
     finally { setSendingCode(false); }
@@ -80,8 +80,8 @@ export const Auth = () => {
     e.preventDefault(); setVerifyingCode(true); setVerificationError('');
     const code = verificationCode.join('');
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/email-verification/verify-code`, { email: registerEmail, code });
-      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/complete-registration`, { email: registerEmail, password: registerPassword, full_name: `${firstName} ${lastName}` });
+      await emailVerificationAPI.verifyCode(registerEmail, code);
+      await authAPI.completeRegistration({ email: registerEmail, password: registerPassword, full_name: `${firstName} ${lastName}` } as any);
       setVerificationSuccess(true);
       setTimeout(() => { setShowVerification(false); setVerificationSuccess(false); setIsRegisterMode(false); navigate('/login'); setFirstName(''); setLastName(''); setRegisterEmail(''); setRegisterPassword(''); setConfirmPassword(''); setVerificationCode(['','','','','','']); setCodeSent(false); }, 2000);
     } catch (err: any) { setVerificationError(err.response?.data?.detail || t('register.invalidCode')); }
@@ -110,7 +110,7 @@ export const Auth = () => {
     if (!validateRegisterForm()) return;
     setRegisterLoading(true);
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/register`, { email: registerEmail, password: registerPassword, full_name: `${firstName} ${lastName}` });
+      await authAPI.register({ email: registerEmail, password: registerPassword, full_name: `${firstName} ${lastName}` } as any);
       await sendVerificationCode();
       setShowVerification(true);
     } catch (err: any) { setRegisterError(err.response?.data?.detail || t('register.registrationError')); }

@@ -18,7 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import UserManagement from '../components/UserManagement';
 import { PasswordStrength } from '../components/ui/PasswordStrength';
-import axios from 'axios';
+import { authAPI } from '../services/api';
 
 type TabType = 'profile' | 'userManagement' | 'security' | 'notifications';
 
@@ -72,19 +72,10 @@ export const Settings = () => {
     setChangingPassword(true);
 
     try {
-      const token = localStorage.getItem('access_token');
-      await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/change-password`,
-        {
-          current_password: currentPassword,
-          new_password: newPassword
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
+      await authAPI.changePassword({
+        current_password: currentPassword,
+        new_password: newPassword
+      });
 
       setPasswordSuccess(true);
       setCurrentPassword('');

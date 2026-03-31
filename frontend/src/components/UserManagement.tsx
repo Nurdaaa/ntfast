@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import axios from 'axios';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -19,6 +18,7 @@ import { useActivity } from '../context/ActivityContext';
 import { formatTimeAgo, formatExactTime } from '../hooks/useActivityMonitor';
 import UserProfile from './UserProfile';
 import { StatCardSkeleton, TableSkeleton } from './ui/Skeleton';
+import { authAPI, usersAPI } from '../services/api';
 
 interface User {
   id: number;
@@ -64,13 +64,8 @@ const UserManagement: React.FC = () => {
 
   const fetchCurrentUser = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      setCurrentUser(response.data);
+      const data = await authAPI.getCurrentUser();
+      setCurrentUser(data);
     } catch (error) {
       console.error('Error fetching current user:', error);
     }
@@ -78,18 +73,13 @@ const UserManagement: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/users/`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const responseData = await usersAPI.getAll();
 
       // SECURITY: Preserve previous_login from localStorage for current user
       // This prevents previous_login from being overwritten with new values from backend
       const storedPreviousLogin = localStorage.getItem('previous_login');
 
-      const usersData = response.data.map((user: User) => {
+      const usersData = responseData.map((user: User) => {
         // If this is current user and we have stored previous_login, use it
         if (currentUser && user.id === currentUser.id && storedPreviousLogin) {
           return {
@@ -218,17 +208,7 @@ const UserManagement: React.FC = () => {
 
   const handleChangeRole = async (userId: number, newRole: string) => {
     try {
-      const token = localStorage.getItem('access_token');
-      await axios.patch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/users/${userId}/role`,
-        { role: newRole },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      await usersAPI.updateRole(userId, newRole);
       fetchUsers();
       toast.success(t('userManagement.roleUpdateSuccess'));
     } catch (error) {
@@ -243,12 +223,7 @@ const UserManagement: React.FC = () => {
     }
 
     try {
-      const token = localStorage.getItem('access_token');
-      await axios.delete(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/users/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      await usersAPI.delete(userId);
       fetchUsers();
       toast.success(t('userManagement.deleteSuccess'));
     } catch (error) {

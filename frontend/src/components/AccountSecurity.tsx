@@ -5,6 +5,7 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import Modal from './ui/Modal';
 import { formatTimeAgo } from '../hooks/useActivityMonitor';
+import { authAPI } from '../services/api';
 
 interface LoginHistoryRecord {
   id: number;
@@ -40,16 +41,8 @@ const AccountSecurity: React.FC<AccountSecurityProps> = ({ userId }) => {
   // Fetch login history
   const fetchLoginHistory = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/login-history?limit=10`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setLoginHistory(data.history || []);
-      }
+      const data = await authAPI.loginHistory(10);
+      setLoginHistory(data.history || []);
     } catch (error) {
       console.error('Failed to fetch login history:', error);
     }
@@ -58,16 +51,8 @@ const AccountSecurity: React.FC<AccountSecurityProps> = ({ userId }) => {
   // Fetch active sessions
   const fetchActiveSessions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/active-sessions`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setActiveSessions(data.active_sessions || []);
-      }
+      const data = await authAPI.activeSessions();
+      setActiveSessions(data.active_sessions || []);
     } catch (error) {
       console.error('Failed to fetch active sessions:', error);
     }
@@ -76,20 +61,11 @@ const AccountSecurity: React.FC<AccountSecurityProps> = ({ userId }) => {
   // Close all sessions
   const handleCloseAllSessions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/close-all-sessions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        toast.success(data.message);
-        // Refresh active sessions
-        await fetchActiveSessions();
-        setShowTerminateModal(false);
-      }
+      const data = await authAPI.closeAllSessions();
+      toast.success(data.message);
+      // Refresh active sessions
+      await fetchActiveSessions();
+      setShowTerminateModal(false);
     } catch (error) {
       console.error('Failed to close all sessions:', error);
       toast.error('Failed to close sessions');

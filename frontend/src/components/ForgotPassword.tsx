@@ -5,10 +5,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { Moon, Sun, Loader2, AlertCircle, BadgeCheck, ArrowLeft, AtSign, KeyRound, Languages, Eye, EyeOff } from 'lucide-react';
-import axios from 'axios';
 import i18n from '../i18n';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { authAPI } from '../services/api';
 
 export const ForgotPassword = () => {
   const [step, setStep] = useState<'email' | 'code' | 'success'>('email');
@@ -52,7 +50,7 @@ export const ForgotPassword = () => {
     setError('');
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/api/auth/forgot-password`, { email });
+      await authAPI.forgotPassword({ email });
       setStep('code');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Ошибка при отправке кода');
@@ -68,7 +66,7 @@ export const ForgotPassword = () => {
     if (newPassword.length < 6) { setError('Пароль должен содержать минимум 6 символов'); return; }
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/api/auth/reset-password`, { email, code, new_password: newPassword });
+      await authAPI.resetPassword({ email, code, new_password: newPassword });
       setStep('success');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Неверный или истёкший код');
@@ -80,7 +78,7 @@ export const ForgotPassword = () => {
     setError('');
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/api/auth/forgot-password`, { email });
+      await authAPI.forgotPassword({ email });
       setTimeout(() => codeInputRefs.current[0]?.focus(), 100);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Ошибка при повторной отправке');

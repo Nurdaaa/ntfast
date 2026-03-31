@@ -75,15 +75,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async () => {
     try {
       // Call backend logout endpoint to update online status
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-      }
+      await authAPI.logout();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

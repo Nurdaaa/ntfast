@@ -44,12 +44,23 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "Unknown"
 
 
+@router.get("/registration-config")
+async def registration_config():
+    """Return registration configuration for frontend (e.g., whether email verification is required)."""
+    from app.core.config import settings
+    return {
+        "require_email_verification": settings.REQUIRE_EMAIL_VERIFICATION,
+    }
+
+
 @router.post("/register")
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     """
     Step 1: Check user data and send verification code
-    User will be created ONLY after email verification
+    User will be created ONLY after email verification (if enabled)
     """
+    from app.core.config import settings
+
     # Check if email exists
     db_user = get_user_by_email(db, user.email)
     if db_user:
@@ -58,9 +69,15 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
 
+    # If email verification is disabled, create user immediately
+    if not settings.REQUIRE_EMAIL_VERIFICATION:
+        new_user = create_user(db, user)
+        logger.info(f"User registered without email verification: {user.email}")
+        return {"message": "Registration successful", "verification_required": False}
+
     # Do NOT create user yet - just return success
     # User will be created after email verification
-    return {"message": "Registration data validated. Please verify your email."}
+    return {"message": "Registration data validated. Please verify your email.", "verification_required": True}
 
 
 @router.post("/complete-registration", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

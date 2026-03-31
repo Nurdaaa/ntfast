@@ -63,8 +63,13 @@ export const authAPI = {
     return response.data;
   },
 
-  register: async (data: RegisterData): Promise<User> => {
-    const response = await api.post<User>('/auth/register', data);
+  register: async (data: RegisterData): Promise<any> => {
+    const response = await api.post('/auth/register', data);
+    return response.data;
+  },
+
+  getRegistrationConfig: async (): Promise<{ require_email_verification: boolean }> => {
+    const response = await api.get('/auth/registration-config');
     return response.data;
   },
 

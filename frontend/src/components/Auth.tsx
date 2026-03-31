@@ -110,7 +110,20 @@ export const Auth = () => {
     if (!validateRegisterForm()) return;
     setRegisterLoading(true);
     try {
-      await authAPI.register({ email: registerEmail, password: registerPassword, full_name: `${firstName} ${lastName}` } as any);
+      const result = await authAPI.register({ email: registerEmail, password: registerPassword, full_name: `${firstName} ${lastName}` } as any);
+
+      // If verification is not required, registration is complete
+      if (result.verification_required === false) {
+        setRegisterSuccess(true);
+        setTimeout(() => {
+          setIsRegisterMode(false);
+          navigate('/login');
+          setFirstName(''); setLastName(''); setRegisterEmail(''); setRegisterPassword(''); setConfirmPassword('');
+        }, 1500);
+        return;
+      }
+
+      // Email verification required — send code and show verification form
       await sendVerificationCode();
       setShowVerification(true);
     } catch (err: any) { setRegisterError(err.response?.data?.detail || t('register.registrationError')); }

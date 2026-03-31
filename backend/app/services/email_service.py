@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Service for sending emails via Resend API or SMTP fallback"""
+    """Service for sending emails via Brevo, Resend API, or SMTP fallback"""
 
     # Configuration from settings
     SMTP_SERVER = settings.SMTP_SERVER
@@ -22,6 +22,7 @@ class EmailService:
     USE_REAL_EMAIL = settings.USE_REAL_EMAIL
     RESEND_API_KEY = settings.RESEND_API_KEY
     EMAIL_PROVIDER = settings.EMAIL_PROVIDER
+    BREVO_API_KEY = settings.BREVO_API_KEY
 
     # ──────────────────────────────────────────────
     # HTML templates
@@ -109,6 +110,37 @@ class EmailService:
             return False
 
     @staticmethod
+    def _send_via_brevo(to_email: str, subject: str, html_body: str) -> bool:
+        """Send email via Brevo (Sendinblue) HTTP API — 300 emails/day free, no domain needed."""
+        try:
+            sender_email = EmailService.SMTP_USERNAME or "noreply@ntfast.app"
+            response = httpx.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={
+                    "api-key": EmailService.BREVO_API_KEY,
+                    "Content-Type": "application/json",
+                    "accept": "application/json",
+                },
+                json={
+                    "sender": {"name": "ntFAST", "email": sender_email},
+                    "to": [{"email": to_email}],
+                    "subject": subject,
+                    "htmlContent": html_body,
+                },
+                timeout=10,
+            )
+            if response.status_code in (200, 201):
+                data = response.json()
+                logger.info(f"[BREVO] Email sent to {to_email}, messageId={data.get('messageId')}")
+                return True
+            else:
+                logger.error(f"[BREVO] Failed to send to {to_email}: {response.status_code} {response.text}")
+                return False
+        except Exception as e:
+            logger.error(f"[BREVO] Exception sending to {to_email}: {e}")
+            return False
+
+    @staticmethod
     def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str = "") -> bool:
         """Send email via SMTP (mail.ru, gmail, etc.)."""
         try:
@@ -139,15 +171,54 @@ class EmailService:
 
     @staticmethod
     def _send_email(to_email: str, subject: str, html_body: str, text_body: str = "") -> bool:
-        """Send email using configured provider (resend or smtp)."""
-        # Priority: Resend > SMTP > Demo
-        if EmailService.RESEND_API_KEY and EmailService.EMAIL_PROVIDER == "resend":
-            return EmailService._send_via_resend(to_email, subject, html_body)
-        elif EmailService.USE_REAL_EMAIL and EmailService.SMTP_USERNAME and EmailService.SMTP_PASSWORD:
-            return EmailService._send_via_smtp(to_email, subject, html_body, text_body)
-        else:
+        """Send email using configured provider with automatic fallback.
+
+        Priority chain: configured provider → fallback providers → demo mode.
+        Brevo: 300/day free, works for ALL emails, no domain needed.
+        Resend: fast but free plan only sends to account owner's email.
+        SMTP: works locally but often blocked from cloud servers.
+        """
+        provider = EmailService.EMAIL_PROVIDER
+
+        # Build ordered list of send methods to try
+        send_methods = []
+
+        if provider == "brevo" and EmailService.BREVO_API_KEY:
+            send_methods.append(("brevo", lambda: EmailService._send_via_brevo(to_email, subject, html_body)))
+        elif provider == "resend" and EmailService.RESEND_API_KEY:
+            send_methods.append(("resend", lambda: EmailService._send_via_resend(to_email, subject, html_body)))
+
+        # Fallback: try Brevo if not primary
+        if provider != "brevo" and EmailService.BREVO_API_KEY:
+            send_methods.append(("brevo-fallback", lambda: EmailService._send_via_brevo(to_email, subject, html_body)))
+
+        # Fallback: try Resend if not primary
+        if provider != "resend" and EmailService.RESEND_API_KEY:
+            send_methods.append(("resend-fallback", lambda: EmailService._send_via_resend(to_email, subject, html_body)))
+
+        # Fallback: try SMTP
+        if EmailService.USE_REAL_EMAIL and EmailService.SMTP_USERNAME and EmailService.SMTP_PASSWORD:
+            send_methods.append(("smtp", lambda: EmailService._send_via_smtp(to_email, subject, html_body, text_body)))
+
+        # Try each method in order
+        for name, method in send_methods:
+            try:
+                if method():
+                    if "fallback" in name:
+                        logger.info(f"[EMAIL] Sent via {name} (primary provider failed)")
+                    return True
+                else:
+                    logger.warning(f"[EMAIL] {name} returned False for {to_email}, trying next...")
+            except Exception as e:
+                logger.warning(f"[EMAIL] {name} failed for {to_email}: {e}, trying next...")
+
+        # No provider worked
+        if not send_methods:
             logger.info(f"[DEMO] Email to {to_email}: subject='{subject}' (no provider configured)")
             return True
+        else:
+            logger.error(f"[EMAIL] All providers failed for {to_email}")
+            return False
 
     # ──────────────────────────────────────────────
     # Public API

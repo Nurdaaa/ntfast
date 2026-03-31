@@ -52,7 +52,13 @@ class Settings(BaseSettings):
 
     # Resend.com API (alternative to SMTP, works from cloud servers)
     RESEND_API_KEY: str = ""
-    EMAIL_PROVIDER: str = "smtp"  # "smtp" or "resend"
+    EMAIL_PROVIDER: str = "smtp"  # "smtp", "resend", or "brevo"
+
+    # Brevo (Sendinblue) — 300 emails/day free, works without custom domain
+    BREVO_API_KEY: str = ""
+
+    # Email verification toggle — set to false to skip verification on registration
+    REQUIRE_EMAIL_VERIFICATION: bool = True
 
     # File Upload Configuration
     UPLOAD_DIR: str = "./uploads"

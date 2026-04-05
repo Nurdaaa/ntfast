@@ -56,12 +56,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.setItem('session_start', response.session_start);
     }
 
-    // Fetch current user (includes previous_login from backend)
-    // Token is set AFTER this succeeds to avoid broken state where token exists but user is null
-    const currentUser = await authAPI.getCurrentUser();
-
-    // Only persist token after successful user fetch
+    // Save token FIRST so getCurrentUser() can use it in Authorization header
     localStorage.setItem('access_token', response.access_token);
+
+    // Fetch current user (includes previous_login from backend)
+    const currentUser = await authAPI.getCurrentUser();
 
     // SECURITY: Save previous_login to localStorage (backend is source of truth)
     // This value is FIXED and should NEVER change during current session
